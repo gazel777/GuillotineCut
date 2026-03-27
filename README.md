@@ -35,6 +35,20 @@ To add as a permanent script in Illustrator:
 2. Restart Illustrator
 3. Access from **File > Scripts > GuillotineCut**
 
+## Keyboard Shortcut (Recommended)
+
+Assign a shortcut so you can run GuillotineCut with one key:
+
+1. Open **Window > Actions**
+2. Click the **New Action** button (folder icon first if needed)
+3. Name it `GuillotineCut`, assign a **Function Key** (e.g. `F5`), click **Record**
+4. Go to **File > Scripts > Other Script...** and select `GuillotineCut.jsx`
+5. Click **Stop Recording** in the Actions panel
+
+Now your workflow is:
+
+> Draw a line → Select all → **F5** → Done
+
 ## Limitations (MVP)
 
 - Horizontal or vertical cuts only (no diagonal)
@@ -48,4 +62,4 @@ MIT — free to use, modify, and distribute.
 
 ## Author
 
-FrameTools — https://x.com/FrameTools01
+Hiro — https://x.com/hiro_11go
