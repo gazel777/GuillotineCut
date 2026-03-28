@@ -1,6 +1,6 @@
 /*
   GuillotineCut.jsx — Illustrator Script
-  Cut selected paths along horizontal and/or vertical lines.
+  Cut selected paths along any straight line (horizontal, vertical, 45°, or any angle).
   Supports multiple cutting lines — slice objects into grids in one action.
 
   Usage:
@@ -90,16 +90,11 @@
     return;
   }
 
-  // Sort cutting lines by position: H lines top-to-bottom, V lines left-to-right
-  // Process one cut at a time — each cut produces new paths that feed into the next cut
+  // Build cut info for each cutting line
   var cutInfos = [];
   for (var ci = 0; ci < cuttingLines.length; ci++) {
     cutInfos.push(getCutInfo(cuttingLines[ci]));
   }
-  cutInfos.sort(function (a, b) {
-    if (a.direction !== b.direction) return a.direction === "H" ? -1 : 1;
-    return a.value - b.value;
-  });
 
   // ============================================================
   // 2. Process each cutting line in sequence
@@ -124,7 +119,7 @@
   }
 
   // ============================================================
-  // Helper: Detect if a path is a cutting line (2-point straight H or V)
+  // Helper: Detect if a path is a cutting line (2-point straight line, any angle)
   // ============================================================
   function isCuttingLine(path) {
     if (path.pathPoints.length !== 2) return false;
@@ -132,13 +127,12 @@
     var p1 = path.pathPoints[1];
     // Must be straight (handles == anchors)
     if (!isStraightPoint(p0) || !isStraightPoint(p1)) return false;
+    // Must have some length
     var a0 = p0.anchor;
     var a1 = p1.anchor;
     var dx = Math.abs(a1[0] - a0[0]);
     var dy = Math.abs(a1[1] - a0[1]);
-    if (dx < TOLERANCE && dy > TOLERANCE) return true; // vertical
-    if (dy < TOLERANCE && dx > TOLERANCE) return true; // horizontal
-    return false;
+    return (dx > TOLERANCE || dy > TOLERANCE);
   }
 
   function isStraightPoint(pp) {
@@ -156,11 +150,17 @@
   function getCutInfo(line) {
     var a0 = line.pathPoints[0].anchor;
     var a1 = line.pathPoints[1].anchor;
-    if (Math.abs(a1[1] - a0[1]) < TOLERANCE) {
-      return { direction: "H", value: a0[1] };
-    } else {
-      return { direction: "V", value: a0[0] };
-    }
+    // General line equation: la*x + lb*y + lc = 0
+    // From two points: (y0-y1)*x + (x1-x0)*y + (x0*y1 - x1*y0) = 0
+    var la = a0[1] - a1[1];
+    var lb = a1[0] - a0[0];
+    var lc = a0[0] * a1[1] - a1[0] * a0[1];
+    // Normalize so that la^2 + lb^2 = 1 (unit normal)
+    var len = Math.sqrt(la * la + lb * lb);
+    la /= len;
+    lb /= len;
+    lc /= len;
+    return { la: la, lb: lb, lc: lc };
   }
 
   // ============================================================
@@ -213,25 +213,25 @@
   }
 
   // ============================================================
-  // 4. Bezier-line intersection
+  // 4. Bezier-line intersection (general line: la*x + lb*y + lc = 0)
   // ============================================================
   function findIntersections(seg, cut) {
     // seg = [P0, P1, P2, P3] cubic bezier
-    // cut = { direction: "H"|"V", value: number }
-    var idx = cut.direction === "H" ? 1 : 0;
-    var val = cut.value;
+    // cut = { la, lb, lc } — line equation la*x + lb*y + lc = 0
+    // Compute f(t) = la*Bx(t) + lb*By(t) + lc = 0
+    // where B(t) is the cubic bezier
 
-    // Extract the coordinate component
-    var c0 = seg[0][idx];
-    var c1 = seg[1][idx];
-    var c2 = seg[2][idx];
-    var c3 = seg[3][idx];
+    // Evaluate la*x + lb*y + lc at each control point
+    var f0 = cut.la * seg[0][0] + cut.lb * seg[0][1] + cut.lc;
+    var f1 = cut.la * seg[1][0] + cut.lb * seg[1][1] + cut.lc;
+    var f2 = cut.la * seg[2][0] + cut.lb * seg[2][1] + cut.lc;
+    var f3 = cut.la * seg[3][0] + cut.lb * seg[3][1] + cut.lc;
 
     // Convert to polynomial: a*t^3 + b*t^2 + c*t + d = 0
-    var a = -c0 + 3 * c1 - 3 * c2 + c3;
-    var b = 3 * c0 - 6 * c1 + 3 * c2;
-    var c = -3 * c0 + 3 * c1;
-    var d = c0 - val;
+    var a = -f0 + 3 * f1 - 3 * f2 + f3;
+    var b = 3 * f0 - 6 * f1 + 3 * f2;
+    var c = -3 * f0 + 3 * f1;
+    var d = f0;
 
     var roots = solveCubic(a, b, c, d);
     var validRoots = [];
