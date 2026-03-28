@@ -1,13 +1,13 @@
 # GuillotineCut.jsx
 
-Cut selected paths along a horizontal or vertical line in Adobe Illustrator — **without outlining strokes**.
+Cut selected paths along any straight line in Adobe Illustrator — **without outlining strokes**. Horizontal, vertical, 45°, any angle. Multiple lines at once.
 
 ## How to Use
 
-1. Draw a straight **horizontal or vertical line** where you want to cut
-2. **Select** the cutting line + the target path(s)
+1. Draw one or more **straight lines** where you want to cut (any angle)
+2. **Select** the cutting line(s) + the target path(s)
 3. Go to **File > Scripts > Other Script...** and choose `GuillotineCut.jsx`
-4. Done — your objects are split at the line
+4. Done — your objects are split at the line(s)
 
 ![concept](https://via.placeholder.com/400x200?text=Before+→+After)
 
@@ -18,7 +18,8 @@ Cut selected paths along a horizontal or vertical line in Adobe Illustrator — 
 - Handles **bezier curves** (not just straight segments)
 - Preserves stroke color, width, dashes, fill, and opacity
 - Cuts **multiple objects** at once
-- Horizontal and vertical cutting
+- **Any angle** — horizontal, vertical, 45°, or arbitrary
+- **Multiple cutting lines** at once — grid-slice in one action
 
 ## Requirements
 
@@ -47,11 +48,11 @@ Assign a shortcut so you can run GuillotineCut with one key:
 
 Now your workflow is:
 
-> Draw a line → Select all → **F5** → Done
+> Draw line(s) → Select all → **F5** → Done
 
 ## Limitations (MVP)
 
-- Horizontal or vertical cuts only (no diagonal)
+- ~~Horizontal or vertical cuts only~~ Now supports any angle!
 - Does not work on compound paths (yet)
 - Does not cut grouped objects (ungroup first)
 - Does not cut text (convert to outlines first)
