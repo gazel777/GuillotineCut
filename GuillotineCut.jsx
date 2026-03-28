@@ -1,12 +1,13 @@
 /*
   GuillotineCut.jsx — Illustrator Script
-  Cut selected paths along a horizontal or vertical line.
+  Cut selected paths along horizontal and/or vertical lines.
+  Supports multiple cutting lines — slice objects into grids in one action.
 
   Usage:
-    1. Draw a straight line (horizontal or vertical) as the cutting guide
-    2. Select the cutting line + target paths
+    1. Draw one or more straight lines (horizontal and/or vertical) as cutting guides
+    2. Select the cutting line(s) + target paths
     3. Run File > Scripts > GuillotineCut.jsx
-    4. Objects are split at the cutting line
+    4. Objects are split at all cutting lines
 
   Requires: Adobe Illustrator CS6+
   License: MIT
@@ -64,19 +65,19 @@
     return;
   }
 
-  // Find cutting line — prefer the topmost (first in selection = front-most in stacking order)
-  var cuttingLine = null;
+  // Find ALL cutting lines and separate from targets
+  var cuttingLines = [];
   var targets = [];
 
   for (var i = 0; i < allPaths.length; i++) {
-    if (!cuttingLine && isCuttingLine(allPaths[i])) {
-      cuttingLine = allPaths[i];
+    if (isCuttingLine(allPaths[i])) {
+      cuttingLines.push(allPaths[i]);
     } else {
       targets.push(allPaths[i]);
     }
   }
 
-  if (!cuttingLine) {
+  if (cuttingLines.length === 0) {
     alert(
       "GuillotineCut\n\nNo cutting line found.\nDraw a straight horizontal or vertical line and include it in your selection."
     );
@@ -84,25 +85,43 @@
   }
   if (targets.length === 0) {
     alert(
-      "GuillotineCut\n\nNo target paths found.\nSelect at least one path to cut in addition to the cutting line."
+      "GuillotineCut\n\nNo target paths found.\nSelect at least one path to cut in addition to the cutting line(s)."
     );
     return;
   }
 
-  var cutInfo = getCutInfo(cuttingLine);
-  // cutInfo = { direction: "H"|"V", value: number }
+  // Sort cutting lines by position: H lines top-to-bottom, V lines left-to-right
+  // Process one cut at a time — each cut produces new paths that feed into the next cut
+  var cutInfos = [];
+  for (var ci = 0; ci < cuttingLines.length; ci++) {
+    cutInfos.push(getCutInfo(cuttingLines[ci]));
+  }
+  cutInfos.sort(function (a, b) {
+    if (a.direction !== b.direction) return a.direction === "H" ? -1 : 1;
+    return a.value - b.value;
+  });
 
   // ============================================================
-  // 2. Process each target
+  // 2. Process each cutting line in sequence
   // ============================================================
   app.executeMenuCommand("deselectall");
 
-  for (var t = 0; t < targets.length; t++) {
-    splitPath(targets[t], cutInfo);
+  var currentTargets = targets;
+  for (var ci = 0; ci < cutInfos.length; ci++) {
+    var nextTargets = [];
+    for (var t = 0; t < currentTargets.length; t++) {
+      var results = splitPathMulti(currentTargets[t], cutInfos[ci]);
+      for (var r = 0; r < results.length; r++) {
+        nextTargets.push(results[r]);
+      }
+    }
+    currentTargets = nextTargets;
   }
 
-  // Remove cutting line
-  cuttingLine.remove();
+  // Remove all cutting lines
+  for (var ci = 0; ci < cuttingLines.length; ci++) {
+    cuttingLines[ci].remove();
+  }
 
   // ============================================================
   // Helper: Detect if a path is a cutting line (2-point straight H or V)
@@ -145,9 +164,9 @@
   }
 
   // ============================================================
-  // 3. Main splitting logic
+  // 3. Main splitting logic — returns array of resulting PathItems
   // ============================================================
-  function splitPath(path, cut) {
+  function splitPathMulti(path, cut) {
     var pts = path.pathPoints;
     var isClosed = path.closed;
     var segCount = isClosed ? pts.length : pts.length - 1;
@@ -165,7 +184,7 @@
       }
     }
 
-    if (intersections.length === 0) return; // No intersection, skip
+    if (intersections.length === 0) return [path]; // No intersection, return original
 
     // Sort intersections by segment index, then by t
     intersections.sort(function (a, b) {
@@ -174,9 +193,9 @@
     });
 
     if (isClosed) {
-      splitClosedPath(path, cut, intersections);
+      return splitClosedPath(path, cut, intersections);
     } else {
-      splitOpenPath(path, cut, intersections);
+      return splitOpenPath(path, cut, intersections);
     }
   }
 
@@ -432,16 +451,18 @@
       subPaths.push(currentPoints);
     }
 
-    if (subPaths.length < 2) return; // Nothing to split
+    if (subPaths.length < 2) return [path]; // Nothing to split
 
     // Create new paths
     var layer = path.layer;
+    var results = [];
     for (var sp = 0; sp < subPaths.length; sp++) {
-      createPathFromPoints(layer, subPaths[sp], false, path);
+      results.push(createPathFromPoints(layer, subPaths[sp], false, path));
     }
 
     // Remove original
     path.remove();
+    return results;
   }
 
   // ============================================================
@@ -572,20 +593,21 @@
       if (path2Points.length > allPoints.length + 1) break; // safety
     }
 
-    if (path1Points.length < 2 || path2Points.length < 2) return;
+    if (path1Points.length < 2 || path2Points.length < 2) return [path];
 
     // Fix cut edges: the closing segment (last→first) must be straight
-    // Path1: last point's rightDir = its anchor, first point's leftDir = its anchor
     straightenCutEdge(path1Points);
     straightenCutEdge(path2Points);
 
     // Create new closed paths
     var layer = path.layer;
-    createPathFromPoints(layer, path1Points, true, path);
-    createPathFromPoints(layer, path2Points, true, path);
+    var results = [];
+    results.push(createPathFromPoints(layer, path1Points, true, path));
+    results.push(createPathFromPoints(layer, path2Points, true, path));
 
     // Remove original
     path.remove();
+    return results;
   }
 
   function straightenCutEdge(pts) {
