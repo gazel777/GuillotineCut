@@ -65,15 +65,54 @@
     return;
   }
 
-  // Find ALL cutting lines and separate from targets
+  // Separate cutting lines from targets using stacking order:
+  // The FRONTMOST straight 2-point lines = cutting lines
+  // Everything else = targets
+  //
+  // Strategy: sort all straight 2-point lines by zOrderPosition (lower = more front).
+  // Find the cluster of frontmost lines (drawn last / on top).
+  // Any straight line that is IN FRONT of all non-line paths = cutting line.
+
+  var straightLines = []; // { index, zOrder }
+  var otherPaths = [];    // { index, zOrder }
+
+  for (var i = 0; i < allPaths.length; i++) {
+    if (isCuttingLine(allPaths[i])) {
+      straightLines.push({ idx: i, z: allPaths[i].zOrderPosition });
+    } else {
+      otherPaths.push({ idx: i, z: allPaths[i].zOrderPosition });
+    }
+  }
+
+  // Find the lowest zOrder (= most front) among non-line paths
+  var frontmostOther = Infinity;
+  for (var i = 0; i < otherPaths.length; i++) {
+    if (otherPaths[i].z < frontmostOther) frontmostOther = otherPaths[i].z;
+  }
+
+  // Lines with zOrder < frontmostOther are in front of all targets → cutting lines
+  // Lines with zOrder >= frontmostOther are behind or mixed → targets
   var cuttingLines = [];
   var targets = [];
 
   for (var i = 0; i < allPaths.length; i++) {
-    if (isCuttingLine(allPaths[i])) {
+    if (isCuttingLine(allPaths[i]) && allPaths[i].zOrderPosition < frontmostOther) {
       cuttingLines.push(allPaths[i]);
     } else {
       targets.push(allPaths[i]);
+    }
+  }
+
+  // Fallback: if no lines are in front, treat ALL straight lines as cutting lines
+  if (cuttingLines.length === 0) {
+    cuttingLines = [];
+    targets = [];
+    for (var i = 0; i < allPaths.length; i++) {
+      if (isCuttingLine(allPaths[i])) {
+        cuttingLines.push(allPaths[i]);
+      } else {
+        targets.push(allPaths[i]);
+      }
     }
   }
 
