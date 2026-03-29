@@ -65,54 +65,49 @@
     return;
   }
 
-  // Separate cutting lines from targets using stacking order:
-  // The FRONTMOST straight 2-point lines = cutting lines
-  // Everything else = targets
-  //
-  // Strategy: sort all straight 2-point lines by zOrderPosition (lower = more front).
-  // Find the cluster of frontmost lines (drawn last / on top).
-  // Any straight line that is IN FRONT of all non-line paths = cutting line.
+  // Separate cutting lines from targets.
+  // Non-straight paths (curves, shapes) = always targets
+  // Straight 2-point lines: use stacking order to decide.
+  // Lines IN FRONT of any non-straight path = cutting lines.
+  // If ALL paths are straight lines, the topmost one = cutting line.
 
-  var straightLines = []; // { index, zOrder }
-  var otherPaths = [];    // { index, zOrder }
-
-  for (var i = 0; i < allPaths.length; i++) {
-    if (isCuttingLine(allPaths[i])) {
-      straightLines.push({ idx: i, z: allPaths[i].zOrderPosition });
-    } else {
-      otherPaths.push({ idx: i, z: allPaths[i].zOrderPosition });
-    }
-  }
-
-  // Find the lowest zOrder (= most front) among non-line paths
-  var frontmostOther = Infinity;
-  for (var i = 0; i < otherPaths.length; i++) {
-    if (otherPaths[i].z < frontmostOther) frontmostOther = otherPaths[i].z;
-  }
-
-  // Lines with zOrder < frontmostOther are in front of all targets → cutting lines
-  // Lines with zOrder >= frontmostOther are behind or mixed → targets
   var cuttingLines = [];
   var targets = [];
 
+  // First: are there any non-straight paths?
+  var hasNonStraight = false;
   for (var i = 0; i < allPaths.length; i++) {
-    if (isCuttingLine(allPaths[i]) && allPaths[i].zOrderPosition < frontmostOther) {
-      cuttingLines.push(allPaths[i]);
-    } else {
-      targets.push(allPaths[i]);
-    }
+    if (!isCuttingLine(allPaths[i])) { hasNonStraight = true; break; }
   }
 
-  // Fallback: if no lines are in front, treat ALL straight lines as cutting lines
-  if (cuttingLines.length === 0) {
-    cuttingLines = [];
-    targets = [];
+  if (hasNonStraight) {
+    // Normal case: straight lines = cutting, others = targets
     for (var i = 0; i < allPaths.length; i++) {
       if (isCuttingLine(allPaths[i])) {
         cuttingLines.push(allPaths[i]);
       } else {
         targets.push(allPaths[i]);
       }
+    }
+  } else {
+    // ALL are straight 2-point lines → topmost = cutting line(s)
+    // Find the highest zOrderPosition (= frontmost in Illustrator)
+    var maxZ = -1;
+    for (var i = 0; i < allPaths.length; i++) {
+      var z = allPaths[i].zOrderPosition;
+      if (z > maxZ) maxZ = z;
+    }
+    // All lines at the max z-level = cutting lines, rest = targets
+    for (var i = 0; i < allPaths.length; i++) {
+      if (allPaths[i].zOrderPosition === maxZ) {
+        cuttingLines.push(allPaths[i]);
+      } else {
+        targets.push(allPaths[i]);
+      }
+    }
+    // If somehow all have same z, take just the first as cutting line
+    if (targets.length === 0 && cuttingLines.length > 1) {
+      targets = cuttingLines.splice(1);
     }
   }
 
