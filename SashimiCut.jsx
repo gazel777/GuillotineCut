@@ -246,13 +246,20 @@
       }
     }
 
-    // Endpoint check: if an anchor sits on the cutting line, inject a near-endpoint root
-    // This catches cases where a previous cut created an anchor exactly on the next cut line
-    var ENDPOINT_TOL = 0.5; // 0.5pt tolerance — generous but safe for design work
-    if (Math.abs(f0) < ENDPOINT_TOL && validRoots.length === 0) {
+    // Endpoint check: if an anchor sits on (or very near) the cutting line,
+    // inject a near-endpoint root. Always check — not just when validRoots is empty.
+    // This fixes cuts through ellipse anchor points (left/right widest points).
+    var ENDPOINT_TOL = 0.5; // 0.5pt tolerance
+    var hasNearStart = false;
+    var hasNearEnd = false;
+    for (var j = 0; j < validRoots.length; j++) {
+      if (validRoots[j] < 0.01) hasNearStart = true;
+      if (validRoots[j] > 0.99) hasNearEnd = true;
+    }
+    if (Math.abs(f0) < ENDPOINT_TOL && !hasNearStart) {
       validRoots.push(ROOT_MARGIN);
     }
-    if (Math.abs(f3) < ENDPOINT_TOL && validRoots.length === 0) {
+    if (Math.abs(f3) < ENDPOINT_TOL && !hasNearEnd) {
       validRoots.push(1 - ROOT_MARGIN);
     }
 
