@@ -628,39 +628,42 @@
     }
 
     // If no actual splits happened, bail
-    if (splitIndices.length < 2) return;
+    if (splitIndices.length < 2) return [path];
 
-    // Step 2: Partition points into 2 closed paths
-    // Use first 2 split points to divide the ring
-    var idx1 = splitIndices[0];
-    var idx2 = splitIndices[1];
-
-    var path1Points = [];
-    var path2Points = [];
-
-    // Path 1: from idx1 to idx2 (inclusive)
-    for (var k = idx1; k !== (idx2 + 1) % allPoints.length; k = (k + 1) % allPoints.length) {
-      path1Points.push(clonePoint(allPoints[k]));
-      if (path1Points.length > allPoints.length + 1) break; // safety
+    // Ensure even number of intersections (required for closed path splitting)
+    // If odd, drop the last one
+    if (splitIndices.length % 2 !== 0) {
+      splitIndices.pop();
     }
+    if (splitIndices.length < 2) return [path];
 
-    // Path 2: from idx2 to idx1 (inclusive)
-    for (var k = idx2; k !== (idx1 + 1) % allPoints.length; k = (k + 1) % allPoints.length) {
-      path2Points.push(clonePoint(allPoints[k]));
-      if (path2Points.length > allPoints.length + 1) break; // safety
-    }
+    // Step 2: Partition points into closed sub-paths
+    // With N split points (even), we get N arcs between them.
+    // Arcs alternate sides: arc(0→1)=sideA, arc(1→2)=sideB, arc(2→3)=sideA, ...
+    // Each arc + straight closing edge = one closed sub-path
 
-    if (path1Points.length < 2 || path2Points.length < 2) return [path];
-
-    // Fix cut edges: the closing segment (last→first) must be straight
-    straightenCutEdge(path1Points);
-    straightenCutEdge(path2Points);
-
-    // Create new closed paths
-    var layer = path.layer;
+    var n = allPoints.length;
     var results = [];
-    results.push(createPathFromPoints(layer, path1Points, true, path));
-    results.push(createPathFromPoints(layer, path2Points, true, path));
+    var layer = path.layer;
+
+    for (var p = 0; p < splitIndices.length; p++) {
+      var fromIdx = splitIndices[p];
+      var toIdx = splitIndices[(p + 1) % splitIndices.length];
+
+      var arcPoints = [];
+      for (var k = fromIdx; ; k = (k + 1) % n) {
+        arcPoints.push(clonePoint(allPoints[k]));
+        if (k === toIdx) break;
+        if (arcPoints.length > n + 1) break; // safety
+      }
+
+      if (arcPoints.length >= 2) {
+        straightenCutEdge(arcPoints);
+        results.push(createPathFromPoints(layer, arcPoints, true, path));
+      }
+    }
+
+    if (results.length < 2) return [path];
 
     // Remove original
     path.remove();
