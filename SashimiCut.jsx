@@ -235,9 +235,13 @@
 
     var roots = solveCubic(a, b, c, d);
     var validRoots = [];
+    var ROOT_MARGIN = 1e-6; // wider margin to catch near-endpoint roots
     for (var i = 0; i < roots.length; i++) {
       var t = roots[i];
-      if (t > EPSILON && t < 1 - EPSILON) {
+      // Clamp roots that are just barely outside [0,1] due to precision
+      if (t > -ROOT_MARGIN && t < ROOT_MARGIN) t = ROOT_MARGIN;
+      if (t > 1 - ROOT_MARGIN && t < 1 + ROOT_MARGIN) t = 1 - ROOT_MARGIN;
+      if (t > ROOT_MARGIN && t < 1 - ROOT_MARGIN) {
         validRoots.push(t);
       }
     }
@@ -263,14 +267,28 @@
     var disc = (q * q) / 4 + (p * p * p) / 27;
 
     var roots = [];
-    if (Math.abs(disc) < EPSILON) {
-      // Multiple roots
-      if (Math.abs(q) < EPSILON) {
+    // Use larger tolerance for discriminant near zero (precision-critical boundary)
+    var DISC_TOL = 1e-6;
+    if (Math.abs(disc) < DISC_TOL) {
+      // Near-zero discriminant: compute all 3 possible roots and let Newton refine
+      if (Math.abs(p) < EPSILON && Math.abs(q) < EPSILON) {
         roots.push(-bn / 3);
       } else {
-        var u = cubeRoot(-q / 2);
-        roots.push(2 * u - bn / 3);
-        roots.push(-u - bn / 3);
+        // Treat as 3-root case via trigonometric method (safer than Cardano near disc=0)
+        var rr = Math.sqrt(Math.abs((-p * p * p) / 27));
+        if (rr < EPSILON) {
+          roots.push(-bn / 3);
+        } else {
+          var cosArg = (-q / 2) / rr;
+          // Clamp to [-1, 1] to avoid NaN from acos
+          if (cosArg > 1) cosArg = 1;
+          if (cosArg < -1) cosArg = -1;
+          var theta = Math.acos(cosArg);
+          var m = 2 * cubeRoot(rr);
+          roots.push(m * Math.cos(theta / 3) - bn / 3);
+          roots.push(m * Math.cos((theta + 2 * Math.PI) / 3) - bn / 3);
+          roots.push(m * Math.cos((theta + 4 * Math.PI) / 3) - bn / 3);
+        }
       }
     } else if (disc > 0) {
       // One real root
@@ -281,13 +299,34 @@
     } else {
       // Three real roots (casus irreducibilis)
       var r = Math.sqrt((-p * p * p) / 27);
-      var theta = Math.acos((-q / 2) / r);
+      // Clamp acos argument to [-1, 1]
+      var cosArg2 = (-q / 2) / r;
+      if (cosArg2 > 1) cosArg2 = 1;
+      if (cosArg2 < -1) cosArg2 = -1;
+      var theta = Math.acos(cosArg2);
       var m = 2 * cubeRoot(r);
       roots.push(m * Math.cos(theta / 3) - bn / 3);
       roots.push(m * Math.cos((theta + 2 * Math.PI) / 3) - bn / 3);
       roots.push(m * Math.cos((theta + 4 * Math.PI) / 3) - bn / 3);
     }
+
+    // Newton-Raphson refinement for each root (fixes precision drift)
+    for (var i = 0; i < roots.length; i++) {
+      roots[i] = refineRoot(a, b, c, d, roots[i]);
+    }
+
     return roots;
+  }
+
+  function refineRoot(a, b, c, d, t) {
+    // 3 iterations of Newton-Raphson: f(t) = a*t^3 + b*t^2 + c*t + d
+    for (var i = 0; i < 3; i++) {
+      var ft = ((a * t + b) * t + c) * t + d;
+      var dft = (3 * a * t + 2 * b) * t + c;
+      if (Math.abs(dft) < EPSILON) break;
+      t = t - ft / dft;
+    }
+    return t;
   }
 
   function solveQuadratic(a, b, c) {
