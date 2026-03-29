@@ -631,35 +631,54 @@
     if (splitIndices.length < 2) return [path];
 
     // Ensure even number of intersections (required for closed path splitting)
-    // If odd, drop the last one
     if (splitIndices.length % 2 !== 0) {
       splitIndices.pop();
     }
     if (splitIndices.length < 2) return [path];
 
-    // Step 2: Partition points into closed sub-paths
-    // With N split points (even), we get N arcs between them.
-    // Arcs alternate sides: arc(0→1)=sideA, arc(1→2)=sideB, arc(2→3)=sideA, ...
-    // Each arc + straight closing edge = one closed sub-path
-
+    // Step 2: Build arcs between consecutive split points
     var n = allPoints.length;
-    var results = [];
-    var layer = path.layer;
-
+    var arcs = []; // arcs[i] = array of points from splitIndices[i] to splitIndices[i+1]
     for (var p = 0; p < splitIndices.length; p++) {
       var fromIdx = splitIndices[p];
       var toIdx = splitIndices[(p + 1) % splitIndices.length];
-
-      var arcPoints = [];
+      var arcPts = [];
       for (var k = fromIdx; ; k = (k + 1) % n) {
-        arcPoints.push(clonePoint(allPoints[k]));
+        arcPts.push(clonePoint(allPoints[k]));
         if (k === toIdx) break;
-        if (arcPoints.length > n + 1) break; // safety
+        if (arcPts.length > n + 1) break; // safety
       }
+      arcs.push(arcPts);
+    }
 
-      if (arcPoints.length >= 2) {
-        straightenCutEdge(arcPoints);
-        results.push(createPathFromPoints(layer, arcPoints, true, path));
+    // Step 3: Group alternating arcs into 2 sides
+    // Even arcs (0, 2, 4...) = side A, odd arcs (1, 3, 5...) = side B
+    // Connect arcs on the same side with straight edges along the cut line
+    var results = [];
+    var layer = path.layer;
+
+    for (var side = 0; side < 2; side++) {
+      var combined = [];
+      for (var a = side; a < arcs.length; a += 2) {
+        var arc = arcs[a];
+        if (combined.length > 0) {
+          // Add straight edge from previous arc's end to this arc's start
+          // (both points are on the cut line, so the edge is along the cut)
+          var prevEnd = combined[combined.length - 1];
+          var nextStart = arc[0];
+          // Straighten the connection
+          prevEnd.rightDirection = [prevEnd.anchor[0], prevEnd.anchor[1]];
+          nextStart.leftDirection = [nextStart.anchor[0], nextStart.anchor[1]];
+        }
+        // Add all points of this arc (skip first if already added via connection)
+        for (var ap = (combined.length > 0 ? 1 : 0); ap < arc.length; ap++) {
+          combined.push(clonePoint(arc[ap]));
+        }
+      }
+      if (combined.length >= 2) {
+        // Straighten the closing edge (last→first, both on cut line)
+        straightenCutEdge(combined);
+        results.push(createPathFromPoints(layer, combined, true, path));
       }
     }
 
