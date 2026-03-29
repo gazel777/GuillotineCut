@@ -90,24 +90,31 @@
       }
     }
   } else {
-    // ALL are straight 2-point lines → topmost = cutting line(s)
-    // Find the highest zOrderPosition (= frontmost in Illustrator)
-    var maxZ = -1;
+    // ALL are straight 2-point lines → use layer item index to find frontmost
+    // In Illustrator, layer.pageItems[0] = topmost (frontmost)
+    // Lower index = more in front
+    var minIdx = Infinity;
+    var frontItem = null;
     for (var i = 0; i < allPaths.length; i++) {
-      var z = allPaths[i].zOrderPosition;
-      if (z > maxZ) maxZ = z;
+      // Find this item's index in its parent's pageItems
+      var parent = allPaths[i].layer;
+      for (var pi = 0; pi < parent.pageItems.length; pi++) {
+        if (parent.pageItems[pi] === allPaths[i]) {
+          if (pi < minIdx) {
+            minIdx = pi;
+            frontItem = allPaths[i];
+          }
+          break;
+        }
+      }
     }
-    // All lines at the max z-level = cutting lines, rest = targets
+    // The frontmost item = cutting line, rest = targets
     for (var i = 0; i < allPaths.length; i++) {
-      if (allPaths[i].zOrderPosition === maxZ) {
+      if (allPaths[i] === frontItem) {
         cuttingLines.push(allPaths[i]);
       } else {
         targets.push(allPaths[i]);
       }
-    }
-    // If somehow all have same z, take just the first as cutting line
-    if (targets.length === 0 && cuttingLines.length > 1) {
-      targets = cuttingLines.splice(1);
     }
   }
 
