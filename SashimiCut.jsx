@@ -235,7 +235,7 @@
 
     var roots = solveCubic(a, b, c, d);
     var validRoots = [];
-    var ROOT_MARGIN = 1e-6; // wider margin to catch near-endpoint roots
+    var ROOT_MARGIN = 1e-4; // wide margin for near-endpoint roots
     for (var i = 0; i < roots.length; i++) {
       var t = roots[i];
       // Clamp roots that are just barely outside [0,1] due to precision
@@ -245,6 +245,17 @@
         validRoots.push(t);
       }
     }
+
+    // Endpoint check: if an anchor sits on the cutting line, inject a near-endpoint root
+    // This catches cases where a previous cut created an anchor exactly on the next cut line
+    var ENDPOINT_TOL = 0.5; // 0.5pt tolerance — generous but safe for design work
+    if (Math.abs(f0) < ENDPOINT_TOL && validRoots.length === 0) {
+      validRoots.push(ROOT_MARGIN);
+    }
+    if (Math.abs(f3) < ENDPOINT_TOL && validRoots.length === 0) {
+      validRoots.push(1 - ROOT_MARGIN);
+    }
+
     return validRoots;
   }
 
