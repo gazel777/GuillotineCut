@@ -11,7 +11,7 @@
 
   Requires: Adobe Illustrator CS6+
   License: MIT
-  Author: FrameTools (https://x.com/FrameTools01)
+  Author: Hiro (https://x.com/hiro_11go)
 */
 
 (function () {
